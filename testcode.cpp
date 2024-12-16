@@ -100,12 +100,14 @@ int main() {
 	int c = 0;
 	
 	int q = 5;
-	
+
+
+	typedef uint32_t count_type;
 
 	struct site_type {
 		int color;
-		std::vector<uint32_t> qcount;
-		std::vector<uint32_t> neighbs;
+		std::vector<count_type> qcount;
+		std::vector<count_type> neighbs;
 	};
 	std::vector<site_type> sites;
 
@@ -115,7 +117,7 @@ int main() {
 		index_type s1;
 	};
 	std::ifstream fin;
-	fin.open("/Users/ray/anc/graph/N-1e5_c-17.0_q-5", std::ios_base::in);
+	fin.open("/Users/ray/anc/graph/N-1e3_c-17.0_q-5", std::ios_base::in);
 	if (!fin)
 		throw std::runtime_error("cannot open file  to read lattice");
 	int maxs = 0;
@@ -168,7 +170,7 @@ int main() {
 		}
 
 	int n = nsites;
-	float dT = 1e-7;
+	float dT = 1e-5;
 	float T = 1.1;
 	int iters = T/dT;
 	sites.reserve(nsites);
@@ -238,7 +240,7 @@ int main() {
 	////////////////////////////////////// calc energy
 	float en = 0;
 	std::cout << "\nsize is " << nsites << "\n";
-	for(uint32_t i = 0; i < nsites; i++) 
+	for(auto site& : sites) 
 		for(int k = 0; k < sites[i].neighbs.size(); k++){
 			//std::cout << "comparing " << i << " and " << sites[i].neighbs[k] << "\n";
 			if ( (sites[sites[i].neighbs[k]].color == sites[i].color) and (i > sites[i].neighbs[k]) )
@@ -250,16 +252,17 @@ int main() {
 	///////////////////////////////////
 	int counter = 0;
 	auto start = std::chrono::high_resolution_clock::now();
-	while(T>0){
+	for(int ii = 0; ii < iters; ++ii ){
 		
-		for(int i = 0; i < n; i++){
-			site_type& site = sites[i];
+		for(auto site : sites){
+			//site_type& site = sites[i];
 			uint32_t rng32 = next32();
 			uint16_t a16,b16;
 			a16 = (rng32 & 0xFFFF0000) >> 16; //split 32 random bits into 2 16
 			b16 = rng32 & 0x0000FFFF;
 			uint32_t m = uint32_t(a16) * uint32_t(4);
-			int ocolor = sites[i].color;
+			//int ocolor = sites[i].color;
+			int ocolor = site.color;
 			uint32_t altcolor = (sites[i].color+(m>>16)+1)%5;
 			if(ocolor==altcolor) {std::cout<<"ERROR ";}
 			int de = sites[i].qcount[altcolor] - sites[i].qcount[sites[i].color];
@@ -267,12 +270,12 @@ int main() {
 			uint32_t res = m;
 			
 			if (res < 10000*std::exp(-de/T)){
-				for(int k = 0; k < sites[i].neighbs.size(); k++){
+				for(int k = 0; k < sites[i].neighbs.size(); ++k){
 					site_type& neighbor = sites[sites[i].neighbs[k]];
 					if (neighbor.qcount[ocolor]==0) {std::cout << "\nneighb is" << site.neighbs[k] <<&std::fflush;}
 					assert(neighbor.qcount[ocolor]!=0);
-					neighbor.qcount[sites[i].color]--;
-					neighbor.qcount[altcolor]++;
+					--neighbor.qcount[sites[i].color];
+					++neighbor.qcount[altcolor];
 				}
 				sites[i].color = altcolor;
 			}
@@ -281,14 +284,14 @@ int main() {
 		counter++;
 		if(counter == 10000){
 			std::cout << "\niteration "  << " out of " << iters;
-			std::cout << "\nen: " << calc_energy(sites, n)<< "\n" << &std::fflush;
+			std::cout << "\nen: " << calc_energy(sites, n)<< "\n";
 			
 			if(calc_energy(sites, n)==-en)
 				break;
 			en = (calc_energy(sites, n));
 			counter=0;
 			std::chrono::duration<double> el = std::chrono::high_resolution_clock::now() - start;
-			std::cout << "time elapsed: " << el.count();
+			std::cout << "\ntime elapsed: " << el.count();
 		}
 		T-=dT;
 		if (T<=0) {break;}
