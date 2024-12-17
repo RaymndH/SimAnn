@@ -179,7 +179,7 @@ int main() {
 		}
 
 	int n = nsites;
-	float dT = 1e-6;
+	float dT = 1e-7;
 	float T = 1.4;
 	int iters = T/dT;
 	sites.reserve(nsites);
@@ -279,7 +279,7 @@ int main() {
 			m = (uint32_t(b16) * uint32_t(10000)) >> 16;
 			uint32_t res = m;
 			
-			if(std::exp(-float(de)/T) > randfloat()){
+			if(std::exp(-float(de)/T) >= randfloat()){
 			//if (res > std::exp(-de * 10000/T)){
 			//if (std::log(res / 10000) < -de/T){
 
