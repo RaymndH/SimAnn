@@ -79,19 +79,28 @@ float calc_energy(std::vector<S>& sites, uint32_t n) {
 	return en;
 }
 
+int randint(int q) {
+	return(next64() % q);
+}
+
+float randfloat() {
+	float f = (next64() >> 11) * 0x1.0p-53;
+	//std::cout << f << "\n";
+	return(f);
+}
 
 
 int main() {
     
 	std::random_device rd;
-    //s64[0] = rd();
-    s64[0] = 1;
+    s64[0] = rd();
+    //s64[0] = 1;
 	s64[1] = 2901;
 	s64[2] = 12;
 	s64[3] = 112332;
 
-	//s32[0] = rd();
-	s32[0] = 1;
+	s32[0] = rd();
+	//s32[0] = 1;
     s32[1] = 2901;
 	s32[2] = 12;
 	s32[3] = 112332;
@@ -117,7 +126,7 @@ int main() {
 		index_type s1;
 	};
 	std::ifstream fin;
-	fin.open("/Users/ray/anc/graph/N-1e3_c-17.0_q-5", std::ios_base::in);
+	fin.open("./graph/N-1e3_c-18.0_q-5", std::ios_base::in);
 	if (!fin)
 		throw std::runtime_error("cannot open file  to read lattice");
 	int maxs = 0;
@@ -170,8 +179,8 @@ int main() {
 		}
 
 	int n = nsites;
-	float dT = 1e-5;
-	float T = 1.1;
+	float dT = 1e-6;
+	float T = 1.4;
 	int iters = T/dT;
 	sites.reserve(nsites);
 	sites.resize(nsites);
@@ -240,7 +249,7 @@ int main() {
 	////////////////////////////////////// calc energy
 	float en = 0;
 	std::cout << "\nsize is " << nsites << "\n";
-	for(auto site& : sites) 
+	for(size_t i =0; i < nsites; ++i) 
 		for(int k = 0; k < sites[i].neighbs.size(); k++){
 			//std::cout << "comparing " << i << " and " << sites[i].neighbs[k] << "\n";
 			if ( (sites[sites[i].neighbs[k]].color == sites[i].color) and (i > sites[i].neighbs[k]) )
@@ -254,8 +263,8 @@ int main() {
 	auto start = std::chrono::high_resolution_clock::now();
 	for(int ii = 0; ii < iters; ++ii ){
 		
-		for(auto site : sites){
-			//site_type& site = sites[i];
+		for(size_t i = 0; i < nsites; ++i){
+			site_type& site = sites[i];
 			uint32_t rng32 = next32();
 			uint16_t a16,b16;
 			a16 = (rng32 & 0xFFFF0000) >> 16; //split 32 random bits into 2 16
@@ -263,27 +272,34 @@ int main() {
 			uint32_t m = uint32_t(a16) * uint32_t(4);
 			//int ocolor = sites[i].color;
 			int ocolor = site.color;
-			uint32_t altcolor = (sites[i].color+(m>>16)+1)%5;
+			//uint32_t altcolor = (site.color+(m>>16)+1)%5;
+			auto altcolor = (site.color + randint(q-1) + 1) % 5;
 			if(ocolor==altcolor) {std::cout<<"ERROR ";}
-			int de = sites[i].qcount[altcolor] - sites[i].qcount[sites[i].color];
+			int de = site.qcount[altcolor] - site.qcount[site.color];
 			m = (uint32_t(b16) * uint32_t(10000)) >> 16;
 			uint32_t res = m;
 			
-			if (res < 10000*std::exp(-de/T)){
-				for(int k = 0; k < sites[i].neighbs.size(); ++k){
-					site_type& neighbor = sites[sites[i].neighbs[k]];
+			if(std::exp(-float(de)/T) > randfloat()){
+			//if (res > std::exp(-de * 10000/T)){
+			//if (std::log(res / 10000) < -de/T){
+
+				for(int k = 0; k < site.neighbs.size(); ++k){
+					site_type& neighbor = sites[site.neighbs[k]];
 					if (neighbor.qcount[ocolor]==0) {std::cout << "\nneighb is" << site.neighbs[k] <<&std::fflush;}
+					if(neighbor.qcount[ocolor]==0) {
+						std::cout << "site is " << i << " neighb is " << k;
+					}
 					assert(neighbor.qcount[ocolor]!=0);
-					--neighbor.qcount[sites[i].color];
+					--neighbor.qcount[site.color];
 					++neighbor.qcount[altcolor];
 				}
-				sites[i].color = altcolor;
+				site.color = altcolor;
 			}
 		}
 
 		counter++;
 		if(counter == 10000){
-			std::cout << "\niteration "  << " out of " << iters;
+			std::cout << "\niteration " << ii  << " out of " << iters;
 			std::cout << "\nen: " << calc_energy(sites, n)<< "\n";
 			
 			if(calc_energy(sites, n)==-en)

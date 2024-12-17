@@ -18,8 +18,8 @@ int main() {
     generator.seed(std::time(nullptr));
     rng_ = std::bind(std::uniform_real_distribution<double>(0, 1), std::ref(generator));
     //auto rng_ = [generator](void) {return double(generator()/generator.max());};
-    int sig = 4;
-    int mant = 1;
+    int sig = 1;
+    int mant = 3;
     int n = int(sig*std::pow(10,mant));
     float c = 18.0;
     int q = 5;
@@ -87,9 +87,6 @@ int main() {
     }
     int e = 0;
     
-    
-    
-
     
     efile.close();
     std::cout << adj.size() << " sites" ;
