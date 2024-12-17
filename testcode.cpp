@@ -298,7 +298,7 @@ int main() {
 		}
 
 		counter++;
-		if(counter == 10000){
+		if(counter == -10000){
 			std::cout << "\niteration " << ii  << " out of " << iters;
 			std::cout << "\nen: " << calc_energy(sites, n)<< "\n";
 			
