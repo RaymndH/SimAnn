@@ -10,6 +10,7 @@
 #include <tuple>
 #include <string>
 #include <cassert>
+#include <set>
 
 ////////////////////
 
@@ -42,6 +43,25 @@ uint32_t bounded_rand(uint32_t range) {
     return m >> 32;
 }
 
+double d_rand() {
+	return (next64() >> 11) * 0x1.0p-53;
+}
+
+uint32_t murmur64(uint64_t h) {
+  h ^= h >> 33;
+  h *= 0xff51afd7ed558ccdL;
+  h ^= h >> 33;
+  h *= 0xc4ceb9fe1a85ec53L;
+  h ^= h >> 33;
+  return h;
+}
+
+float m_rand(uint64_t h) {
+	uint64_t mh = murmur64(h);
+	float r = mh / (1<<31);
+	return r;
+}
+
 ///////////////////////
 
 
@@ -68,16 +88,7 @@ uint32_t next32(void) {
 
 	return result;
 }
-template<typename S>
-float calc_energy(std::vector<S>& sites, uint32_t n) {
-	float en = 0;
-	for(uint32_t i = 0; i < n; i++) 
-		for(int k = 0; k < sites[i].neighbs.size(); k++){
-			if ( (sites[sites[i].neighbs[k]].color == sites[i].color) and (i > sites[i].neighbs[k]) )
-				en++;}
-	
-	return en;
-}
+
 
 int randint(int q) {
 	return(next64() % q);
@@ -88,6 +99,29 @@ float randfloat() {
 	//std::cout << f << "\n";
 	return(f);
 }
+
+//////////// structs, functions on structs
+
+typedef uint32_t count_type;
+
+struct site_type {
+		int color;
+		std::vector<count_type> qcount;
+		std::vector<count_type> neighbs;
+	};
+
+float calc_energy (std::vector<site_type> sites) {
+		float en = 0;
+		for(size_t i = 0; i < sites.size(); i++) {
+			site_type site = sites[i];
+			for(int k = 0; k < site.neighbs.size(); k++) {
+				site_type neighb = sites[site.neighbs[k]];
+				if ( (neighb.color == site.color) and (i > site.neighbs[k]) )
+					en++;
+			}
+		}
+		return en;
+	}
 
 
 int main() {
@@ -106,19 +140,15 @@ int main() {
 	s32[3] = 112332;
 	typedef unsigned index_type;
 
-	int c = 0;
-	
 	int q = 5;
 
 
-	typedef uint32_t count_type;
+	
 
-	struct site_type {
-		int color;
-		std::vector<count_type> qcount;
-		std::vector<count_type> neighbs;
-	};
+	
 	std::vector<site_type> sites;
+
+	
 
 	///////////////////// read file
 	struct Link {
@@ -131,8 +161,7 @@ int main() {
 		throw std::runtime_error("cannot open file  to read lattice");
 	int maxs = 0;
 	std::vector<Link> links;
-	links.reserve(100);
-
+	links.reserve(1000);
 	bool first_line = true;
 		while (1) {
 			if (first_line) {
@@ -143,13 +172,13 @@ int main() {
 			}
 
 			int s0, s1;
-			int trash;
-			fin >> s0 >> s1 >> trash;
+			fin >> s0 >> s1 ;
 			if (!fin) break;
 			
 			if (s0 < 0 || s1 < 0)
 				throw std::runtime_error("negative spin index in file " );
-
+			if (s0 == s1)
+				throw std::runtime_error("self link not allowed");
 			links.push_back({ index_type(s0), index_type(s1)});
 
 			maxs = s0 > maxs ? s0 : maxs;
@@ -179,7 +208,9 @@ int main() {
 		}
 
 	int n = nsites;
-	float dT = 1e-7;
+	std::cout << "nsites " << nsites << std::endl;
+
+	float dT = 5e-5;
 	float T = 1.4;
 	int iters = T/dT;
 	sites.reserve(nsites);
@@ -193,132 +224,203 @@ int main() {
 		sites[link.s1].neighbs.push_back(link.s0);
 	
 	}
-	std::cout << nsites << &std::fflush;
+	
 	
 
 
 	nsites = sites.size();
+
+	std::cout << "nsites " << nsites << std::endl;
+
+	///////////// initialize colors and qcounts
+
 	for(int i = 0; i < nsites; i++)
 		sites[i].color = bounded_rand(5);
+
 	for(int i = 0; i < nsites; i++)
 		for(int j = 0; j < 5; j++)
 			sites[i].qcount.push_back(0);
-				
 	
-
-	std::cout << "qcount is" << sites[0].qcount[0];
-
-	///////////////////// fill vectors randomly
-	/*
-	for(int i = 0; i < n; i++){
-		sites[i].color = bounded_rand(5);
-		int top = bounded_rand(25);
-		int neighbct = 0;
-		sites[i].qcount.reserve(5);
-		for(auto qc : sites[i].qcount)
-			qc = 0;
-		while(neighbct < top){
-			uint32_t x = bounded_rand(n);
-			if ((x!=i)&&(std::find(sites[i].neighbs.begin(), sites[i].neighbs.end(), x) == sites[i].neighbs.end())) {
-				sites[i].neighbs.push_back(x);
-				neighbct++;
-			}
-		}
-	}*/
-
-	///////////////////////////// fill qcount
 	for(int i = 0; i < nsites; i++){
 		for(int j = 0; j < sites[i].neighbs.size(); j++){
 			sites[i].qcount[sites[sites[i].neighbs[j]].color]++;
 		}
 	}
 
-	////////////////////////////// diagnostics block 
-	/*
-	for(int i = 0; i < 5; i++){
-		std::cout << "site " << i << " color : " << sites[i].color << "\n";
-		for(int j = 0; j < sites[i].neighbs.size(); j++)
-			std::cout << sites[sites[i].neighbs[j]].color << " ";
-		std::cout << "\nqcount: ";
-		for(int j = 0; j < 5; j++)
-			std::cout << "" << static_cast<uint32_t>(sites[i].qcount[j]) << " ";
+	std::cout << "initial energy is " << calc_energy(sites) << "\n";
+
+	////////// maximal independent set algorithm
+	// this part can probably be optimized a bit more, but it only needs to run once to introduce parallelism
+	std::vector<int> groups;
+	std::vector<double> randoms;
+	std::set<int> V;
+	std::set<int> V2;
+	std::set<int> I = {};
+	std::set<int> W = {};
+
+	for (int i = 0; i < nsites; i++) {
+		randoms.push_back(d_rand());
+		groups.push_back(-1);
+		V.insert(i);
+		V2.insert(i);
 		
-		std::cout << "\n";
-	}*/
+	}
+	int color = 0;
+	std::set<int>::iterator itr;
+	std::set<int>::iterator itr2;
 
-	////////////////////////////////////// calc energy
-	float en = 0;
-	std::cout << "\nsize is " << nsites << "\n";
-	for(size_t i =0; i < nsites; ++i) 
-		for(int k = 0; k < sites[i].neighbs.size(); k++){
-			//std::cout << "comparing " << i << " and " << sites[i].neighbs[k] << "\n";
-			if ( (sites[sites[i].neighbs[k]].color == sites[i].color) and (i > sites[i].neighbs[k]) )
-				en++;}
-	std::cout << "initial energy is " << calc_energy(sites, n) << "\n";
-	
-
-
-	///////////////////////////////////
-	int counter = 0;
 	auto start = std::chrono::high_resolution_clock::now();
-	for(int ii = 0; ii < iters; ++ii ){
-		
-		for(size_t i = 0; i < nsites; ++i){
-			site_type& site = sites[i];
-			uint32_t rng32 = next32();
-			uint16_t a16,b16;
-			a16 = (rng32 & 0xFFFF0000) >> 16; //split 32 random bits into 2 16
-			b16 = rng32 & 0x0000FFFF;
-			uint32_t m = uint32_t(a16) * uint32_t(4);
-			//int ocolor = sites[i].color;
-			int ocolor = site.color;
-			//uint32_t altcolor = (site.color+(m>>16)+1)%5;
-			auto altcolor = (site.color + randint(q-1) + 1) % 5;
-			if(ocolor==altcolor) {std::cout<<"ERROR ";}
-			int de = site.qcount[altcolor] - site.qcount[site.color];
-			m = (uint32_t(b16) * uint32_t(10000)) >> 16;
-			uint32_t res = m;
-			
-			if(std::exp(-float(de)/T) >= randfloat()){
-			//if (res > std::exp(-de * 10000/T)){
-			//if (std::log(res / 10000) < -de/T){
 
-				for(int k = 0; k < site.neighbs.size(); ++k){
-					site_type& neighbor = sites[site.neighbs[k]];
-					if (neighbor.qcount[ocolor]==0) {std::cout << "\nneighb is" << site.neighbs[k] <<&std::fflush;}
-					if(neighbor.qcount[ocolor]==0) {
-						std::cout << "site is " << i << " neighb is " << k;
-					}
-					assert(neighbor.qcount[ocolor]!=0);
-					--neighbor.qcount[site.color];
-					++neighbor.qcount[altcolor];
+	for(color = 0; color < 10; color++){
+		I.clear();
+		W.clear();
+		V.insert(V2.begin(), V2.end());
+		while(V.size()) {
+			W.clear();
+			for(itr = V.begin(); itr != V.end(); itr++) {
+				bool f = 1;
+				for(auto neighb : sites[*itr].neighbs) {
+					if ( std::find(V.begin(), V.end(), neighb)!= V.end() && neighb < *itr) f = 0;
 				}
-				site.color = altcolor;
+				if (f) W.insert(*itr); //Let W be the set of vertices in V with no earlier neighbours (based on the fixed ordering);
+			}
+			I.insert(W.begin(), W.end()); //Add W to I;
+			
+			for(itr2 = W.begin(); itr2 != W.end(); itr2++) { //Remove from V the nodes in the set W and all their neighbours.
+				V.erase(*itr2);
+				for(auto neighb : sites[*itr2].neighbs)
+					V.erase(neighb);
 			}
 		}
-
-		counter++;
-		if(counter == -10000){
-			std::cout << "\niteration " << ii  << " out of " << iters;
-			std::cout << "\nen: " << calc_energy(sites, n)<< "\n";
-			
-			if(calc_energy(sites, n)==-en)
-				break;
-			en = (calc_energy(sites, n));
-			counter=0;
-			std::chrono::duration<double> el = std::chrono::high_resolution_clock::now() - start;
-			std::cout << "\ntime elapsed: " << el.count();
+		for(itr = I.begin(); itr != I.end(); itr++){
+			groups[*itr] = color;
 		}
+		for(itr = I.begin(); itr != I.end(); itr++){
+			V2.erase(*itr);
+		}}
+	auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+	std::cout << "finished with presort"<<std::endl;
+	std::cout << "elapsed time: " << elapsed.count() << std::endl;
+	int maxgroups = 0;
+	for(int i = 0; i < n; i++)
+		if (groups[i] > maxgroups) maxgroups = groups[i];
+	std::cout << "max no of groups " << maxgroups << std::endl
+	<< "breakdown:\n";
+	std::vector<int> breakdown;
+	std::vector<std::vector<int>> vecgroups;
+	for (int i = 0; i < maxgroups; i++) {
+		breakdown.push_back(0);
+		vecgroups.push_back({});
+		for(int ii = 0; ii< n; ii++) {
+			if (groups[ii] == i){
+				breakdown[i]++;
+				vecgroups[i].push_back(ii);
+			}
+		}
+	} 
+	for (int i = 0; i < breakdown.size(); i++) {
+		std::cout << i << ": " << breakdown[i] << std::endl;
+	}
+	std::cout << *std::fflush << std::endl;
+	
+
+	std::cout << "collisions: " << std::endl;
+	for(int groupind = 0; groupind < vecgroups.size(); groupind++) {
+		std::vector<int> group = vecgroups[groupind];
+		for(int i = 0; i < group.size(); i++){
+			site_type site = sites[group[i]];
+			for(auto neighb : site.neighbs) {
+				if (std::find(group.begin(), group.end(), neighb) != group.end()) {
+					std::cout << "collision in group " << groupind << " at site " << group[i] << " with neighbor " << neighb << std::endl;
+				}
+			}
+		}
+	}
+
+	///////////////////////////////////
+	
+	
+	std::vector<int> addlist = {};
+	std::vector<int> sublist = {};
+	//int sames = 1;
+	std::vector<int> vecsites = {};
+
+	
+	//clear groupings
+	/*
+	vecgroups.clear();
+	vecgroups.push_back({});
+	for(size_t i = 0; i < nsites; i++){
+		vecgroups[0].push_back(i);
+	}
+	*/
+	vecsites.clear();
+	for(size_t i = 0; i < nsites; i++)
+		vecsites.push_back(i);
+	std::cout << "beginning " << iters << " iterations" << std::endl;
+	for(int ii = 0; ii < iters; ++ii ) {
+	//	for(auto group : vecgroups) {
+	//		for(auto i : group) {
+			for(auto i : vecsites) {
+				site_type& site = sites[i];
+				int col = site.color;
+				int alt = (col + (next64() % q-1) + 1);
+				if (alt >= q) alt -= q;
+				int de = site.qcount[alt] - site.qcount[col];
+				if (de < 0) {
+					for(int k = 0; k < site.neighbs.size(); k++) {
+							site_type& neighb = sites[site.neighbs[k]];
+							neighb.qcount[alt]++;
+							neighb.qcount[col]--;
+							//if ( neighb.color = alt ) addlist.append(neighb,alt);
+							//if ( neighb.color = site.col) sublist.append(neighb,col);
+							site.color = alt;
+						}
+				}
+				if ( de >= 0 ) {
+					float rng = randfloat();// replace with hash(iter << 32 | site)
+					//float rng = m_rand((uint64_t)ii << 32 | i);
+					if (std::exp(-1/T*de) > rng ) {
+						for(int k = 0; k < site.neighbs.size(); k++) {
+							site_type& neighb = sites[site.neighbs[k]];
+							neighb.qcount[alt]++;
+							neighb.qcount[col]--;
+							//if ( neighb.color = alt ) addlist.append(neighb,alt);
+							//if ( neighb.color = site.col) sublist.append(neighb,col);
+							site.color = alt;
+						}
+					}
+				}
+			//sort addlist?
+			//std::sort(addlist.begin(), addlist.end())
+
+			/*
+
+			for pair in addlist:
+				site = sites[pair[0]];
+				color = pair[1];
+				site.qcount[color]++;
+			//same for sublist
+			for pair in sublist:
+				site = sites[pair[0]];
+				color = pair[1];
+				site.q[color]--;
+
+				*/
+			
+			}
 		T-=dT;
+		if (ii % 10000 == 0) std::cout << "\r" << ((ii*1000)/iters)*.001 << "% complete "  << std::flush ;
 		if (T<=0) {break;}
 	}
 
-	auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
+	end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
 
-    std::cout << "Elapsed time: " << elapsed.count() << " seconds" << std::endl;
+    std::cout << "\n" << "Elapsed time: " << elapsed.count() << " seconds" << std::endl;
 
-	std::cout << "final energy is " << calc_energy(sites, n) << "\n";
+	std::cout << "final energy is " << calc_energy(sites) << "\n";
 
 	std::cout << "final temp: " << T;
 
