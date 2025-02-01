@@ -7,7 +7,11 @@ g++ testcode.cpp -std=c++11 -O3 -o testcode.out
 to use plantstate:
 g++ plantstate.cpp -std=c++11 -O3 -o plant
 ## Algorithm
-![SAdiagram](https://github.com/user-attachments/assets/0ff19de0-f4eb-4bfc-88ae-fbe893a4b263)
+The basics of the algorithm is to take a undirected graph and find a coloring which satisfies the fewest possible color conflicts between connected nodes given a maximum number of colors.
+
+The basis of this is to start with a random coloring, and then iterate through the graph
+
+![SAdiagram](https://github.com/user-attachments/assets/4c4fb895-bc55-4ce5-8b30-8b887706a060)
 .
 
 A color change which changes the energy from 0 to +1
