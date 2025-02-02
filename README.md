@@ -17,3 +17,4 @@ The basis of this is to start with a random coloring, and then iterate through e
 Example of a graph with 4 nodes, and 3 colors. Changing the color of the third node from green to red changes the energy of the system from 0 to +1. This change will be accepted with a probability of exp(-1/T).
 
 
+
