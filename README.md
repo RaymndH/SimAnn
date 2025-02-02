@@ -14,6 +14,6 @@ The basis of this is to start with a random coloring, and then iterate through e
 ![SAdiagram](https://github.com/user-attachments/assets/4c4fb895-bc55-4ce5-8b30-8b887706a060)
 .
 
-A color change which changes the energy from 0 to +1. This change will be accepted with a probability of exp(-1/T).
+Example of a graph with 4 nodes, and 3 colors. Changing the color of the third node from green to red changes the energy of the system from 0 to +1. This change will be accepted with a probability of exp(-1/T).
 
 
